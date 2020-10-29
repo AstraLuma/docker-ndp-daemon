@@ -6,7 +6,7 @@ log = logging.getLogger(__name__)
 
 class Config(dict):
     def __init__(self, *args, **kwargs):
-        super(Config, self).__init__(*args, **kwargs)
+        super().__init__(*args, **kwargs)
         self.__dict__ = self
 
 
@@ -35,7 +35,3 @@ except Exception as ex:
     raise ImportError("The config file '{}' was found but section {} is missing.".format(config_file, ex))
 
 logger.level = loglevel_map[logger.level.lower()]
-
-
-
-

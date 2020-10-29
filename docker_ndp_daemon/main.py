@@ -1,23 +1,22 @@
-def init_app():
-    import sys
-    import logging
-    from daemon import DockerNdpDaemon
-    from daemon import DaemonException
-    from daemon import DaemonTimeoutException
+import sys
+import logging
 
+from .daemon import DockerNdpDaemon
+from .daemon import DaemonException
+from .daemon import DaemonTimeoutException
+from . import config
+
+def init_app():
     logger = logging.getLogger(__name__)
     daemon = None
 
+    logging.basicConfig(format=config.logger.format)
+    logging.root.setLevel(config.logger.level)
+
     try:
-        import config
-
-        logging.basicConfig(format=config.logger.format)
-        logging.root.setLevel(config.logger.level)
-
         daemon = DockerNdpDaemon(
             config.docker.socket,
             config.host.gateway)
-
     except DaemonTimeoutException as ex:
         logger.debug(ex)
         logger.info("Docker connection read timed out. Reconnecting ...")
@@ -33,8 +32,3 @@ def init_app():
     except Exception as ex:
         logger.critical("CRITICAL: Unexpected exception '{}' catched - possible bug: {}".format(ex.__class__, ex))
         sys.exit(2)
-
-
-if __name__ == "__main__":
-    init_app()
-
