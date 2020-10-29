@@ -101,4 +101,4 @@ class DockerEventDaemon:
             container.id],
             stdin=DEVNULL, stdout=PIPE, stderr=PIPE, encoding='utf-8', check=True,
         )
-        return process.stdout.strip()
+        return process.stdout.strip() or None

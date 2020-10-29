@@ -1,8 +1,8 @@
 import unittest
 import mock
-import config
+from docker_ndp_daemon import config
 import logging
-import main
+from docker_ndp_daemon import main
 
 logger = logging.getLogger(__name__)
 logging.basicConfig(format=config.logger.format)
@@ -21,12 +21,12 @@ class MainTest(unittest.TestCase):
         """Sets _daemon with mocked :class:`DockerClient``
         """
 
-    @mock.patch('daemon.DockerNdpDaemon')
+    @mock.patch('docker_ndp_daemon.daemon.DockerNdpDaemon')
     def test_main__ok(self, mock_docker_ndp_daemon):
         main.init_app()
         self.assertTrue(mock_docker_ndp_daemon.called)
 
-    @mock.patch('daemon.DockerNdpDaemon', side_effect=side_effect_value_error)
+    @mock.patch('docker_ndp_daemon.daemon.DockerNdpDaemon', side_effect=side_effect_value_error)
     @mock.patch('sys.exit')
     def test_main__fail_exception_raised(self, mock_sys_exit, mock_docker_ndp_daemon):
         main.init_app()

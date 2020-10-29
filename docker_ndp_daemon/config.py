@@ -1,5 +1,6 @@
 import logging
 import configparser
+from pathlib import Path
 
 log = logging.getLogger(__name__)
 
@@ -18,7 +19,7 @@ loglevel_map = {'critical': logging.CRITICAL,
                 'info': logging.INFO,
                 'debug': logging.DEBUG
                 }
-config_file = "../dnd.ini"
+config_file = Path(__file__).resolve().parent.parent / "dnd.ini"
 
 conf = configparser.ConfigParser()
 successful_files = conf.read(config_file)
@@ -35,7 +36,7 @@ try:
     logger = Config(conf['logger'])
 except Exception as ex:
     raise ImportError(
-        f"The config file '{config_file}' was found but section {ex} is missing."
-    )
+        f"The config file '{config_file}' was found but section is missing."
+    ) from ex
 
 logger.level = loglevel_map[logger.level.lower()]
