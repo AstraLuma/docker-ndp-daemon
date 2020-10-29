@@ -19,24 +19,20 @@ loglevel_map = {'critical': logging.CRITICAL,
                 'info': logging.INFO,
                 'debug': logging.DEBUG
                 }
-config_file = Path(__file__).resolve().parent.parent / "dnd.ini"
 
 conf = configparser.ConfigParser()
-successful_files = conf.read(config_file)
-if not successful_files:
-    open(config_file)  # Raises error if not found
-    raise ImportError(
-        f"The config file '{config_file}' was found but could not be parsed."
-    )
+conf.read([
+    Path(__file__).resolve().parent.parent / "dnd.ini",
+    '/etc/docker-ndp-daemon.ini',
+])
 
 try:
     # Create sections with attributes
     host = Config(conf['host'])
-    docker = Config(conf['docker'])
     logger = Config(conf['logger'])
 except Exception as ex:
     raise ImportError(
-        f"The config file '{config_file}' was found but section is missing."
+        f"Missing config sections"
     ) from ex
 
 logger.level = loglevel_map[logger.level.lower()]

@@ -59,8 +59,8 @@ class DockerEventDaemon:
                 event = json.loads(jsonEvent)
                 if event['Type'] == 'network' and event['Action'] == 'connect':
                     self._handle_network_connect_event(event)
-        except ReadTimeoutError:
-            raise
+        except ReadTimeoutError as ex:
+            raise TimeoutError from ex
         except Exception:
             if self._terminate:
                 logger.warning("Error during termination", exc_info=True)

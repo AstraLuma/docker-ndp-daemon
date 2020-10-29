@@ -24,14 +24,14 @@ class DockerNdpDaemonTest(unittest.TestCase):
                 mock_activate.return_value = (0, "command", None)
                 with mock.patch.object(DockerNdpDaemon, '_add_all_existing_containers_to_neigh_proxy'):
                     with mock.patch.object(DockerNdpDaemon, 'listen_network_connect_events'):
-                        self._daemon = DockerNdpDaemon("socket", "ethernet")
+                        self._daemon = DockerNdpDaemon(socket_url="socket", ethernet_interface="ethernet")
 
     @mock.patch.object(DockerClient, '__init__', return_value=None)
     @mock.patch.object(DockerNdpDaemon, '_activate_ndp_proxy', side_effect=Exception("Command Error"))
     def test_init__fail(self, mock_activate_proxy, mock_client):
         """Tests if an exception raises when _activate_ndp_proxy's return code != 0"""
         try:
-            DockerNdpDaemon("socket", "ethernet")
+            DockerNdpDaemon(socket_url="socket", ethernet_interface="ethernet")
             self.fail("ValueError expected")
         except Exception as ex:
             logger.info("{}: {}".format(ex.__class__, ex))

@@ -12,20 +12,19 @@ class DockerNdpDaemon(DockerEventDaemon):
     """
     _ethernet_interface = None
 
-    def __init__(self, socket_url, ethernet_interface):
+    def __init__(self, *, socket_url=None, ethernet_interface):
         """ Creates a new instance.
 
         :param (str) socket_url: Path of the dockerndp socket file.
         :param (str) ethernet_interface: Name of the ethernet interface that is
            an internet gateway.
         """
-        super().__init__(socket_url)
+        super().__init__(socket_url=socket_url)
         self._ethernet_interface = ethernet_interface
 
         self._activate_ndp_proxy()
 
         self._add_all_existing_containers_to_neigh_proxy()
-        self.listen_network_connect_events()
 
     def _handle_network_connect_event(self, event):
         # Fetches Container from id in event
