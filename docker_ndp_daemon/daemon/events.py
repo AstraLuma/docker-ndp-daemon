@@ -1,10 +1,8 @@
 import logging
-from docker import DockerClient
+from docker import DockerClient, from_env
 import json
 import signal
-from subprocess import Popen, PIPE
-from daemon.exceptions import DaemonException
-from daemon.exceptions import DaemonTimeoutException
+from subprocess import run, PIPE, DEVNULL
 from urllib3.exceptions import ReadTimeoutError
 
 logger = logging.getLogger(__name__)
@@ -22,22 +20,11 @@ class DockerEventDaemon:
     """
 
     # Properties
-    _socket_url = None
+    socket_url = None
     _client = None
-    _events = None
     _terminate = False
 
-    # Getters / Setters
-
-    @property
-    def socket_url(self):
-        return self._socket_url
-
-    @socket_url.setter
-    def socket_url(self, val):
-        self._socket_url = val
-
-    def __init__(self, socket_url):
+    def __init__(self, socket_url=None):
         """Creates a new DockerClient.
 
         :param socket_url: URL to the Docker server.
@@ -46,45 +33,44 @@ class DockerEventDaemon:
             >>> DockerEventDaemon("unix://var/run/dockerndp.sock")
             >>> DockerEventDaemon("tcp://127.0.0.1:1234")
         """
-        assert socket_url, "socket_url not set!"
         signal.signal(signal.SIGINT, self._handle_termination)
         signal.signal(signal.SIGTERM, self._handle_termination)
         self.socket_url = socket_url
 
         logger.info("Connecting ...")
         self._client = self.init_docker_client()
-        if not self._client:
-            raise(DaemonException("Unable to connect."))
+        assert self._client
 
     def init_docker_client(self):
         """
         :return: the docker client object
         """
-        return DockerClient(base_url=self.socket_url)
+        if self.socket_url is None:
+            return from_env()
+        else:
+            return DockerClient(base_url=self.socket_url)
 
     # Listens for network connect client and calls handle_network_connect_event
     def listen_network_connect_events(self):
         logger.info("Listening for Events ...")
 
         try:
-            self._events = self._client.events()
-            for jsonEvent in self._events:
+            for jsonEvent in self._client.events():
                 event = json.loads(jsonEvent)
                 if event['Type'] == 'network' and event['Action'] == 'connect':
                     self._handle_network_connect_event(event)
-        except ReadTimeoutError as ex:
-            raise DaemonTimeoutException(parent=ex)
-        except Exception as ex:
+        except ReadTimeoutError:
+            raise
+        except Exception:
             if self._terminate:
-                logger.warning("Error during termination: {}".format(ex))
+                logger.warning("Error during termination", exc_info=True)
             else:
-                raise DaemonException(parent=ex)
+                raise
 
     def shutdown(self):
         """shuts down the daemon."""
         logger.info("Shutting down ...")
         self._terminate = True
-        self._events.close()
         self._client.close()
 
     # Handler for all net work connection client
@@ -93,12 +79,12 @@ class DockerEventDaemon:
 
     # Shutdown app (Param _ (frame) is not needed.
     def _handle_termination(self, signum, _):
-        logger.info("Signal '{}' received.".format(signum))
+        logger.info("Signal %r received.", signum)
         self.shutdown()
 
     # Fetches IPv6 address
     @staticmethod
-    def fetch_ipv6_address(container) -> (int, str, str):
+    def fetch_ipv6_address(container) -> str:
         """Extracts the ipv6 address of a container.
 
         Since :class:`docker.DockerClient` does not have the ability to read the IPv6 address
@@ -107,17 +93,12 @@ class DockerEventDaemon:
         :param container: The container from which the
         :return: Tuple (Returncode, IPv6 address, STDERR if Returncode is not 0)
         """
-        process = Popen([
+        process = run([
             "docker",
             "container",
             "inspect",
             "--format={{range .NetworkSettings.Networks}}{{.GlobalIPv6Address}}{{end}}",
             container.id],
-            stdin=PIPE, stdout=PIPE, stderr=PIPE)
-        stdout, stderr = process.communicate()
-
-        stdout = stdout.decode('utf-8').rstrip() if stdout else ""
-        stdout = stdout if stdout else None
-        stderr = stderr.decode('utf-8').rstrip() if stderr else ""
-        stderr = stderr if stderr else None
-        return process.returncode, stdout, stderr
+            stdin=DEVNULL, stdout=PIPE, stderr=PIPE, encoding='utf-8', check=True,
+        )
+        return process.stdout.strip()

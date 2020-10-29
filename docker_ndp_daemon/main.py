@@ -1,10 +1,8 @@
-import sys
 import logging
 
 from .daemon import DockerNdpDaemon
-from .daemon import DaemonException
-from .daemon import DaemonTimeoutException
 from . import config
+
 
 def init_app():
     logger = logging.getLogger(__name__)
@@ -17,18 +15,13 @@ def init_app():
         daemon = DockerNdpDaemon(
             config.docker.socket,
             config.host.gateway)
-    except DaemonTimeoutException as ex:
+    except TimeoutError as ex:
         logger.debug(ex)
         logger.info("Docker connection read timed out. Reconnecting ...")
         if daemon:
             daemon.shutdown()
         init_app()
-        return()
+    except (KeyboardInterrupt, SystemExit):
+        return
 
-    except DaemonException as ex:
-        logger.critical("CRITICAL: {}".format(ex))
-        sys.exit(1)
-
-    except Exception as ex:
-        logger.critical("CRITICAL: Unexpected exception '{}' catched - possible bug: {}".format(ex.__class__, ex))
-        sys.exit(2)
+    # Just let other kinds of exceptions blow up the app with python's default handler

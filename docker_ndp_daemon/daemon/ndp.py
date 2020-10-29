@@ -1,7 +1,6 @@
 import logging
 from .events import DockerEventDaemon
-from .exceptions import DaemonException
-from subprocess import Popen, PIPE
+from subprocess import run, PIPE, DEVNULL
 
 logger = logging.getLogger(__name__)
 
@@ -17,14 +16,13 @@ class DockerNdpDaemon(DockerEventDaemon):
         """ Creates a new instance.
 
         :param (str) socket_url: Path of the dockerndp socket file.
-        :param (str) ethernet_interface: Name of the ethernet interface that is an internet gateway.
+        :param (str) ethernet_interface: Name of the ethernet interface that is
+           an internet gateway.
         """
         super().__init__(socket_url)
         self._ethernet_interface = ethernet_interface
 
-        rval, cmd, stderr = self._activate_ndp_proxy()
-        if rval != 0:
-            raise (DaemonException("{} returned with code '{}': '{}'".format(cmd, rval, stderr)))
+        self._activate_ndp_proxy()
 
         self._add_all_existing_containers_to_neigh_proxy()
         self.listen_network_connect_events()
@@ -40,50 +38,39 @@ class DockerNdpDaemon(DockerEventDaemon):
     def _add_container_to_ipv6_ndp_proxy(self, container):
         ipv6_address = self._try_fetch_ipv6_address(container)
         if not ipv6_address:
-            logger.info("Ignoring container '{}'. It has no IPv6 address.".format(container.name))
+            logger.info("Ignoring container %r. It has no IPv6 address.", container.name)
             return
 
-        rval, cmd, stderr = self._add_ipv6_neigh_proxy(ipv6_address)
-        if rval != 0:
-            raise (DaemonException("{} returned with code '{}': '{}'".format(cmd, rval, stderr)))
+        self._add_ipv6_neigh_proxy(ipv6_address)
 
-        logger.info("Setting IPv6 ndp proxy for container '{}': '{}'".format(container.name, cmd))
+        logger.info("Set IPv6 ndp proxy for container %r: %r", container.name, ipv6_address)
 
     @staticmethod
     def _try_fetch_ipv6_address(container):
         # Adds the passed container to the ipv6 neighbour discovery proxy
-        rval, ipv6_address, stderr = DockerNdpDaemon.fetch_ipv6_address(container)
-        if rval != 0:
-            raise (DaemonException("Fetching IPv6 address for container '{}' returned with code '{}': '{}'"
-                   .format(container.name, rval, stderr)))
+        ipv6_address = DockerNdpDaemon.fetch_ipv6_address(container)
 
         if not ipv6_address:
             return None
 
-        logger.debug("Event: Container '{}' connected to dockerndp network has IPv6 address '{}'."
-                     .format(container.name, ipv6_address))
+        logger.debug("Event: Container  %r connected to dockerndp network has IPv6 address %r",
+                     container.name, ipv6_address)
         return ipv6_address
 
     def _add_ipv6_neigh_proxy(self, ipv6_address) -> (int, str, str):
         # Sets IPv6 neighbour discovery to ethernet interface.
-        cmd = "sudo ip -6 neigh add proxy {} dev {}".format(ipv6_address, self._ethernet_interface)
-        process = Popen(cmd.split(), stdin=PIPE, stdout=PIPE, stderr=PIPE)
+        run(
+            ['ip', '-6', 'neigh', 'add', 'proxy', ipv6_address, 'dev', self._ethernet_interface],
+            stdin=DEVNULL, stdout=PIPE, stderr=PIPE, encoding='utf-8', check=True,
+        )
 
-        stdout, stderr = process.communicate()
-        stderr = stderr.decode('utf-8').rstrip() if stderr else ""
-        stderr = stderr if stderr else None
-        return process.returncode, cmd, stderr
-
-    def _activate_ndp_proxy(self) -> (int, str, str):
+    def _activate_ndp_proxy(self):
         # Activates the ndp proxy
         logger.info("Activating IPv6 ndp proxy on '{}' ...".format(self._ethernet_interface))
-        cmd = "sudo sysctl net.ipv6.conf.{}.proxy_ndp=1".format(self._ethernet_interface)
-        process = Popen(cmd.split(), stdin=PIPE, stdout=PIPE, stderr=PIPE)
-
-        stdout, stderr = process.communicate()
-        stderr = stderr.decode('utf-8').rstrip() if stderr else ""
-        stderr = stderr if stderr else None
-        return process.returncode, cmd, stderr
+        run(
+            ["sysctl", f"net.ipv6.conf.{self._ethernet_interface}.proxy_ndp=1"],
+            stdin=DEVNULL, stdout=PIPE, stderr=PIPE, encoding='utf-8', check=True,
+        )
 
     def _add_all_existing_containers_to_neigh_proxy(self):
         # Adds all running containers to the IPv6 neighbour discovery proxy

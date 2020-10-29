@@ -24,7 +24,9 @@ conf = configparser.ConfigParser()
 successful_files = conf.read(config_file)
 if not successful_files:
     open(config_file)  # Raises error if not found
-    raise ImportError("The config file '{}' was found but could not be parsed.".format(config_file))
+    raise ImportError(
+        f"The config file '{config_file}' was found but could not be parsed."
+    )
 
 try:
     # Create sections with attributes
@@ -32,6 +34,8 @@ try:
     docker = Config(conf['docker'])
     logger = Config(conf['logger'])
 except Exception as ex:
-    raise ImportError("The config file '{}' was found but section {} is missing.".format(config_file, ex))
+    raise ImportError(
+        f"The config file '{config_file}' was found but section {ex} is missing."
+    )
 
 logger.level = loglevel_map[logger.level.lower()]
