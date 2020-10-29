@@ -17,14 +17,13 @@ Now traffic from or to this IPv6 address is routed over the *network interface* 
 
 ## Installation
 1. Download or clone *docker-ndp-daemon* from this repository.
-2. Change settings in `dnd.ini`. Normally only the `gateway` has to be changed (Default: `eth0`). Set this to your hosts internet gatway network interface. If your docker socket differs from `/var/run/docker.sock` you can change this setting too.
+2. Change settings in `dnd.ini`. Normally only the `gateway` has to be changed (Default: `eth0`). Set this to your hosts internet gatway network interface.
 
-Alternatively you can run the daemon as a docker container as well. You can use [this simple Dockerfile](./Dockerfile) as a template.
+Alternatively you can run the daemon as a docker container as well. You can use [this simple Dockerfile](./Dockerfile) as a template. (NOTE: Actually, please don't.)
 
 ## Startup
-`cd <download-dir>/app && python3 main.py`
+`docker-ndp-daemon`
 
-It is necessary to *cd* into the `<download-dir>/app` directory first so that *docker-ndp-proxy* can find its configuration file `dnd.ini`.
 
 ## Log Output
 After startup the logfile is printed to `STDOUT`:
