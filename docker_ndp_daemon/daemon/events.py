@@ -35,8 +35,14 @@ class DockerEventDaemon:
         self.socket_url = socket_url
 
         logger.info("Connecting ...")
+
+    def __enter__(self):
         self._client = self.init_docker_client()
         assert self._client
+        return self
+
+    def __exit__(self, *exc):
+        self._client.close()
 
     def init_docker_client(self):
         """

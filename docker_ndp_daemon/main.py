@@ -15,13 +15,11 @@ def init_app():
 
         while True:
             try:
-                daemon = DockerNdpDaemon(ethernet_interface=config.host.gateway)
-                daemon.listen_network_connect_events()
+                with DockerNdpDaemon(ethernet_interface=config.host.gateway) as daemon:
+                    daemon.listen_network_connect_events()
             except TimeoutError as ex:
                 logger.debug(ex)
                 logger.info("Docker connection read timed out. Reconnecting ...")
-                if daemon:
-                    daemon.shutdown()
     except (KeyboardInterrupt, SystemExit):
         sys.exit(0)
 

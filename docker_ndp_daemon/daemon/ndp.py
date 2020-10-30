@@ -22,9 +22,11 @@ class DockerNdpDaemon(DockerEventDaemon):
         super().__init__(socket_url=socket_url)
         self._ethernet_interface = ethernet_interface
 
+    def __enter__(self):
+        rv = super().__enter__()
         self._activate_ndp_proxy()
-
         self._add_all_existing_containers_to_neigh_proxy()
+        return rv
 
     def _handle_network_connect_event(self, event):
         # Fetches Container from id in event
