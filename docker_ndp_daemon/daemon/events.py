@@ -22,19 +22,16 @@ class DockerEventDaemon:
     # Properties
     socket_url = None
     _client = None
-    _terminate = False
 
-    def __init__(self, socket_url=None):
+    def __init__(self, *, socket_url=None):
         """Creates a new DockerClient.
 
         :param socket_url: URL to the Docker server.
 
         Example:
-            >>> DockerEventDaemon("unix://var/run/dockerndp.sock")
-            >>> DockerEventDaemon("tcp://127.0.0.1:1234")
+            >>> DockerEventDaemon(socket_url="unix://var/run/dockerndp.sock")
+            >>> DockerEventDaemon(socket_url="tcp://127.0.0.1:1234")
         """
-        signal.signal(signal.SIGINT, self._handle_termination)
-        signal.signal(signal.SIGTERM, self._handle_termination)
         self.socket_url = socket_url
 
         logger.info("Connecting ...")
@@ -67,20 +64,9 @@ class DockerEventDaemon:
             else:
                 raise
 
-    def shutdown(self):
-        """shuts down the daemon."""
-        logger.info("Shutting down ...")
-        self._terminate = True
-        self._client.close()
-
     # Handler for all net work connection client
     def _handle_network_connect_event(self, event: dict):
         pass
-
-    # Shutdown app (Param _ (frame) is not needed.
-    def _handle_termination(self, signum, _):
-        logger.info("Signal %r received.", signum)
-        self.shutdown()
 
     # Fetches IPv6 address
     @staticmethod
