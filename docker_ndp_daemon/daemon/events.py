@@ -53,26 +53,16 @@ class DockerEventDaemon:
         else:
             return DockerClient(base_url=self.socket_url)
 
-    # Listens for network connect client and calls handle_network_connect_event
     def listen_network_connect_events(self):
         logger.info("Listening for Events ...")
 
         try:
-            for jsonEvent in self._client.events():
-                event = json.loads(jsonEvent)
-                if event['Type'] == 'network' and event['Action'] == 'connect':
-                    self._handle_network_connect_event(event)
+            for event in self._client.events(decode=True):
+                method = f"handle_{event['Type']}_{event['Action']}_event"
+                if hasattr(self, method):
+                    getattr(self, method)(event)
         except ReadTimeoutError as ex:
             raise TimeoutError from ex
-        except Exception:
-            if self._terminate:
-                logger.warning("Error during termination", exc_info=True)
-            else:
-                raise
-
-    # Handler for all net work connection client
-    def _handle_network_connect_event(self, event: dict):
-        pass
 
     # Fetches IPv6 address
     @staticmethod
