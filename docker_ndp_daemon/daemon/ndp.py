@@ -50,7 +50,7 @@ class DockerNdpDaemon(DockerEventDaemon):
         # Fetches Container from id in event
         container_id = event['Actor']['Attributes']['container']
         container = self._client.containers.get(container_id)
-        logger.debug("Event: Container '{}' connected to dockerndp network."
+        logger.debug("Event: Container '{}' disconnected from dockerndp network."
                      .format(container.name))
         self._del_container_from_ipv6_ndp_proxy(container)
 
