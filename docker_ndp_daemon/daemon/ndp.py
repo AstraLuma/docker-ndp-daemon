@@ -21,6 +21,7 @@ class DockerNdpDaemon(DockerEventDaemon):
         """
         super().__init__(socket_url=socket_url)
         self.ethernet_interface = ethernet_interface
+        self._address_cache = {}  # (container id, network name) -> ip address
 
     def __enter__(self):
         rv = super().__enter__()
@@ -29,59 +30,59 @@ class DockerNdpDaemon(DockerEventDaemon):
         return rv
 
     def handle_network_connect_event(self, event):
+        logger.debug("event: %r", event)
         # Fetches Container from id in event
         container_id = event['Actor']['Attributes']['container']
+        network = event['Actor']['Attributes']['name']
         container = self._client.containers.get(container_id)
-        logger.debug("Event: Container '{}' connected to dockerndp network."
-                     .format(container.name))
-        self._add_container_to_ipv6_ndp_proxy(container)
+        logger.debug("Event: Container %r connected to %s network",
+                     container.name, network)
+        self._add_container_to_ipv6_ndp_proxy(container, network)
 
-    def _add_container_to_ipv6_ndp_proxy(self, container):
-        ipv6_address = self._try_fetch_ipv6_address(container)
+    def handle_network_disconnect_event(self, event):
+        logger.debug("event: %r", event)
+        # Fetches Container from id in event
+        container_id = event['Actor']['Attributes']['container']
+        network = event['Actor']['Attributes']['name']
+        container = self._client.containers.get(container_id)
+        logger.debug("Event: Container %r disconnected from %s network",
+                     container.name, network)
+        self._del_container_from_ipv6_ndp_proxy(container, network)
+
+    def _add_container_to_ipv6_ndp_proxy(self, container, network):
+        ipv6_address = container.attrs['NetworkSettings']['Networks'][network]['GlobalIPv6Address']
         if not ipv6_address:
-            logger.info("Ignoring container %r. It has no IPv6 address.", container.name)
+            logger.info(
+                "Ignoring container %r on %r. It has no IPv6 address.", container.name, network,
+            )
             return
+
+        self._address_cache[container, network] = ipv6_address
 
         self._add_ipv6_neigh_proxy(ipv6_address)
 
         logger.info("Set IPv6 ndp proxy for container %r: %r", container.name, ipv6_address)
 
-    def handle_network_disconnect_event(self, event):
-        # Fetches Container from id in event
-        container_id = event['Actor']['Attributes']['container']
-        container = self._client.containers.get(container_id)
-        logger.debug("Event: Container '{}' disconnected from dockerndp network."
-                     .format(container.name))
-        self._del_container_from_ipv6_ndp_proxy(container)
-
-    def _del_container_from_ipv6_ndp_proxy(self, container):
-        ipv6_address = self._try_fetch_ipv6_address(container)
-        if not ipv6_address:
-            logger.info("Ignoring container %r. It has no IPv6 address.", container.name)
+    def _del_container_from_ipv6_ndp_proxy(self, container, network):
+        try:
+            ipv6_address = self._address_cache[container, network]
+        except KeyError:
+            logger.info(
+                "Ignoring container %r on %r. I don't remember its IPv6 address.",
+                container.name, network,
+            )
             return
 
         self._del_ipv6_neigh_proxy(ipv6_address)
 
         logger.info("Removed IPv6 ndp proxy for container %r: %r", container.name, ipv6_address)
 
-    @staticmethod
-    def _try_fetch_ipv6_address(container):
-        # Adds the passed container to the ipv6 neighbour discovery proxy
-        ipv6_address = DockerNdpDaemon.fetch_ipv6_address(container)
-
-        if not ipv6_address:
-            return None
-
-        logger.debug("Event: Container  %r connected to dockerndp network has IPv6 address %r",
-                     container.name, ipv6_address)
-        return ipv6_address
-
     def _add_ipv6_neigh_proxy(self, ipv6_address) -> (int, str, str):
         # Sets IPv6 neighbour discovery to ethernet interface.
         logger.info("Adding %r to proxy on %r ...", ipv6_address, self.ethernet_interface)
         run(
             ['ip', '-6', 'neigh', 'add', 'proxy', ipv6_address, 'dev', self.ethernet_interface],
-            stdin=DEVNULL, stdout=PIPE, stderr=PIPE, encoding='utf-8', check=True,
+            stdin=DEVNULL, stdout=PIPE, encoding='utf-8', check=True,
         )
 
     def _del_ipv6_neigh_proxy(self, ipv6_address) -> (int, str, str):
@@ -89,8 +90,9 @@ class DockerNdpDaemon(DockerEventDaemon):
         logger.info("Removing %r from %r ...", ipv6_address, self.ethernet_interface)
         run(
             ['ip', '-6', 'neigh', 'del', 'proxy', ipv6_address, 'dev', self.ethernet_interface],
-            stdin=DEVNULL, stdout=PIPE, stderr=PIPE, encoding='utf-8', check=True,
+            stdin=DEVNULL, stdout=PIPE, encoding='utf-8', check=True,
         )
+
     def _activate_ndp_proxy(self):
         # Activates the ndp proxy
         logger.info("Activating IPv6 ndp proxy on %r ...", self.ethernet_interface)
@@ -103,4 +105,5 @@ class DockerNdpDaemon(DockerEventDaemon):
         # Adds all running containers to the IPv6 neighbour discovery proxy
         logger.info("Adding all runnning containers to IPv6 ndp proxy...")
         for container in self._client.containers.list():
-            self._add_container_to_ipv6_ndp_proxy(container)
+            for network in container.attrs['NetworkSettings']['Networks'].keys():
+                self._add_container_to_ipv6_ndp_proxy(container, network)

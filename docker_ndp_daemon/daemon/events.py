@@ -1,8 +1,5 @@
 import logging
 from docker import DockerClient, from_env
-import json
-import signal
-from subprocess import run, PIPE, DEVNULL
 from urllib3.exceptions import ReadTimeoutError
 
 logger = logging.getLogger(__name__)
@@ -63,24 +60,3 @@ class DockerEventDaemon:
                     getattr(self, method)(event)
         except ReadTimeoutError as ex:
             raise TimeoutError from ex
-
-    # Fetches IPv6 address
-    @staticmethod
-    def fetch_ipv6_address(container) -> str:
-        """Extracts the ipv6 address of a container.
-
-        Since :class:`docker.DockerClient` does not have the ability to read the IPv6 address
-        of a container this method retrieves it with calling the *docker* binary as a sub process.
-
-        :param container: The container from which the
-        :return: Tuple (Returncode, IPv6 address, STDERR if Returncode is not 0)
-        """
-        process = run([
-            "docker",
-            "container",
-            "inspect",
-            "--format={{range .NetworkSettings.Networks}}{{.GlobalIPv6Address}}{{end}}",
-            container.id],
-            stdin=DEVNULL, stdout=PIPE, stderr=PIPE, encoding='utf-8', check=True,
-        )
-        return process.stdout.strip() or None

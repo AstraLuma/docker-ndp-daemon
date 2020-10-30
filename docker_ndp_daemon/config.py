@@ -32,7 +32,7 @@ try:
     logger = Config(conf['logger'])
 except Exception as ex:
     raise ImportError(
-        f"Missing config sections"
+        "Missing config sections"
     ) from ex
 
 logger.level = loglevel_map[logger.level.lower()]
